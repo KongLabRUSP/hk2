@@ -1,0 +1,128 @@
+build human Hisat2 index:
+  administrator@SOP-1482:~/genomes/Homo_sapiens/UCSC/hg19$ ~/bin/hisat2-build genome.fa ./Hisat2_Genome/genome
+
+
+
+###########################
+#mouse
+administrator@SOP-1482:~/Renyi/RNA_gw/mouse$ for i in TR*R1_*; do hisat2 -p 4 -x ~/genomes/Mus_musculus/UCSC/mm10/Hisat2_Genome/genome -1 $i -2 ${i%1_001.fastq.gz}2_001.fastq.gz | samtools view -bh -o ${i%_R1_001.fastq.gz}.bam; done
+# 480 min for 16 samples.  30 min per paired-end sample.
+
+# Sort
+administrator@SOP-1482:~/Renyi/RNA_gw/mouse$ for i in *.bam; do samtools sort -o ${i%.bam}.sorted.bam -@ 3 $i; rm $i; done
+
+# dedup picard
+administrator@SOP-1482:~/Renyi/RNA_gw/mouse$ for i in *.sorted.bam; do java -jar ~/tools/picard/picard.jar MarkDuplicates I=$i O=${i%.sorted.bam}.dedup.bam M=${i%.sorted.bam}.dedup.txt REMOVE_DUPLICATES=true; done
+
+
+# Count
+administrator@SOP-1482:~/Renyi/RNA_gw/mouse$ featureCounts --primary -T 8 -a ~/genomes/Mus_musculus/UCSC/mm10/Annotation/Genes/genes.gtf -o featurecounts.results.TR-all.csv *.dedup.bam
+
+
+administrator@SOP-1482:~/Renyi/RNA_gw/mouse$ samtools view TR01.dedup.bam | wc -l
+96483249
+administrator@SOP-1482:~/Renyi/RNA_gw/mouse$ samtools view TR01.sorted.bam | wc -l
+118403376
+administrator@SOP-1482:~/Renyi/RNA_gw/mouse$ zcat fastq/TR01_R1_001.fastq.gz | wc -l
+217661972
+administrator@SOP-1482:~/Renyi/RNA_gw/mouse$ zcat fastq/TR01_R2_001.fastq.gz | wc -l
+217661972
+
+#FastQC below
+Filename	TR01_R1_001.fastq.gz
+File type	Conventional base calls
+Encoding	Sanger / Illumina 1.9
+Total Sequences	54415493
+Sequences flagged as poor quality	0
+Sequence length	150
+%GC	50
+
+Filename	TR01_R2_001.fastq.gz
+File type	Conventional base calls
+Encoding	Sanger / Illumina 1.9
+Total Sequences	54415493
+Sequences flagged as poor quality	0
+Sequence length	150
+%GC	50
+
+For sample TR01,
+Paired end sequencing, each end has ~54M reads.
+~28M reads were aligned to the genome (mm10) by Hisat2, 24M of which were unique reads (by picard).
+
+
+
+
+
+
+
+#############################
+# Hisat2 for human samples:
+administrator@SOP-1482:~/Renyi/RNA_gw/human$ time for i in *R1_*; do hisat2 -p 4 -x ~/genomes/Homo_sapiens/UCSC/hg19/Hisat2_Genome/genome -1 $i -2 ${i%1_001.fastq.gz}2_001.fastq.gz | samtools view -bh -o ${i%_R1_001.fastq.gz}.bam; done
+# 320 min
+
+#Sort and dedup
+administrator@SOP-1482:~/Renyi/RNA_gw/human$ for i in *.bam; do samtools sort -o ${i%.bam}.sorted.bam -@ 3 $i; rm $i; java -jar ~/tools/picard/picard.jar MarkDuplicates I=${i%.bam}.sorted.bam O=${i%.bam}.dedup.bam  M=${i%.bam}.dedup.txt REMOVE_DUPLICATES=true; done
+
+
+#Count
+administrator@SOP-1482:~/Renyi/RNA_gw/human$ featureCounts --primary -T 8 -a ~/genomes/Homo_sapiens/UCSC/hg19/Annotation/Genes/genes.gtf -o featurecounts.results.human.csv *.dedup.bam
+
+
+
+
+
+
+
+
+
+
+
+########################
+# Hisat2 for rat
+administrator@SOP-1482:~/Renyi/RNA_gw/rat$ time for i in *R1_*; do hisat2 -p 4 -x ~/genomes/Rattus_norvegicus/UCSC/rn6/Hisat2_Genome/genome -1 $i -2 ${i%1_001.fastq.gz}2_001.fastq.gz | samtools view -bh -o ${i%_R1_001.fastq.gz}.bam; done
+# 99 min
+
+
+#sort and dedup
+administrator@SOP-1482:~/Renyi/RNA_gw/rat$ for i in *.bam; do samtools sort -o ${i%.bam}.sorted.bam -@ 3 $i; rm $i; java -jar ~/tools/picard/picard.jar MarkDuplicates I=${i%.bam}.sorted.bam O=${i%.bam}.dedup.bam  M=${i%.bam}.dedup.txt REMOVE_DUPLICATES=true; done
+
+
+renyi@SOP-1482:/share/Renyi/RNA_gw/mouse-k1$ java -jar ~/tools/picard/picard.jar MarkDuplicates I=TR01.sorted.bam O=TR01.picardup.bam  M=TR01.picarddup.txt REMOVE_DUPLICATES=true
+
+#count
+administrator@SOP-1482:~/Renyi/RNA_gw/rat$ featureCounts --primary -T 8 -a ~/genomes/Rattus_norvegicus/UCSC/rn6/Annotation/Genes/genes.gtf -o featurecounts.results.rat.csv *.dedup.bam
+
+
+##
+administrator@SOP-1482:~/Renyi/RNA_gw$ ll -h *.txt */*.csv
+-rw-rw-r-- 1 administrator administrator  15M Apr  2 00:03 human/featurecounts.results.human.csv
+-rw-rw-r-- 1 administrator administrator 9.7M Apr  1 07:52 mouse/featurecounts.results.TR-all.csv
+-rw-rw-r-- 1 administrator administrator 4.7M Apr  1 08:42 rat/featurecounts.results.rat.csv
+-rw-rw-r-- 1 administrator administrator 3.5K Apr  1 23:00 run.txt
+
+
+#### 4-24-2018, re-do hisat2 with -k 1 setting for mouse samples. TR*
+
+renyi@SOP-1482:/share/Renyi/RNA_gw/mouse$ for i in fastq/TR*R1_*; do hisat2 -p 8 -t -k 1 -x ~/genomes/Mus_musculus/UCSC/mm10/Hisat2_Genome/genome -1 $i -2 ${i%1_001.fastq.gz}2_001.fastq.gz | samtools view -bh -o bam2/$(basename ${i%_R1_001.fastq.gz}).bam; done
+# -k 1: each read has no more than 1 alignment. (default 5).
+# 28 min per sample
+
+
+renyi@SOP-1482:/share/Renyi/RNA_gw/mouse-k1$ parallel -j 4 samtools sort {} -o  {/.}.sorted.bam ::: bam2/*.bam
+
+renyi@SOP-1482:/share/Renyi/RNA_gw/mouse-k1$ for i in TR0[24579].sorted.bam TR[12]*.sorted.bam; do java -jar ~/tools/picard/picard.jar MarkDuplicates I=$i O=${i%.sorted.bam}.picardup.bam  M=${i%.sorted.bam}.picardup.txt REMOVE_DUPLICATES=true; echo "Finished $i"; done
+
+
+# featureCounts
+-M multi-mapping reads will also be counted
+-f assign fractional counts to feature for -M option
+-p report fragment counts instead of reads for paired-end sequences.
+-T Threads.
+-a anno file.
+-o output
+
+renyi@SOP-1482:/share/Renyi/RNA_gw/mouse-k1$ featureCounts -M -f -p -T 8 -a ~/genomes/Mus_musculus/UCSC/mm10/Annotation/Genes/genes.gtf -o featurecounts_Mfp_TR-all_k1.csv *picard*bam
+# Result table has the counts for features (exons), not meta-features (genes).
+renyi@SOP-1482:/share/Renyi/RNA_gw/mouse-k1$ featureCounts -M -p -T 8 -a ~/genomes/Mus_musculus/UCSC/mm10/Annotation/Genes/genes.gtf -o featurecounts_Mp_TR-all_k1.csv *picard*bam
+# counts on genes.
+
