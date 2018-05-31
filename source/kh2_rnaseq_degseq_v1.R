@@ -1,0 +1,275 @@
+# |-----------------------------------------------------------------------------------|
+# | Project:  Study of Diabetic Nephropathy in HK2 kidney cells                       |
+# | Script:   RNA-seq data analysis and visualization using DEGSeq                    |
+# | Author:   Davit Sargsyan                                                          |
+# | Created:  05/31/2018                                                              |
+# | Modified:                                                                         |
+# |-----------------------------------------------------------------------------------|
+# sink(file = "tmp/log_kh2_rnaseq_degseq_v1.txt")
+
+# https://bioconductor.org/packages/release/bioc/html/DEGseq.html
+# source("https://bioconductor.org/biocLite.R")
+# biocLite("DEGseq")
+
+# Header----
+require(data.table)
+require(ggplot2)
+require(DEGseq)
+require(knitr)
+
+# Treatment legend----
+trt.names <- c("LG",
+               "HG",
+               "MIC")
+
+# Load data----
+dt1 <- fread("data/featurecounts.results.human.csv")
+dt1 <- droplevels(dt1[, c("Geneid",
+                          "HG.dedup.bam", 
+                          "LG.dedup.bam",
+                          "MIC1.dedup.bam")])
+colnames(dt1) <- c("gene",
+                trt.names)
+
+dt1
+
+# Remove genes with low counts----
+summary(dt1[, -1])
+tmp <- rowSums(dt1[, -1])
+# Remove if total across 3 samples is no more than 10
+dt1 <- droplevels(subset(dt1,
+                         tmp > 10))
+dt1
+# 17,147 genes left, down from 26,364 genes
+
+# DEGseq----
+# a. (HG - LG)----
+DEGexp(geneExpMatrix1 = dt1,
+       geneCol1 = 1, 
+       expCol1 = 3, 
+       groupLabel1 = colnames(dt1)[3],
+       
+       geneExpMatrix2 = dt1,
+       geneCol2 = 1, 
+       expCol2 = 2,
+       groupLabel2 = colnames(dt1)[2],
+       
+       foldChange = 2,
+       qValue = 0.1,
+       thresholdKind = 5, 
+       rawCount = TRUE,
+       normalMethod = "none",
+       method = "MARS",
+       outputDir = "tmp")
+
+hg_lg <- fread("tmp/output_score.txt")
+hg_lg
+hg_lg[hg_lg$`Signature(q-value(Storey et al. 2003) < 0.1)`,]
+
+# Write as CSV----
+write.csv(hg_lg,
+          file = "tmp/HK2_RNAseq_DEGseq_HG-LG.csv",
+          row.names = FALSE)
+
+# MA Plot----
+hg_lg[, mu := (log2(value1) + log2(value2))/2]
+hg_lg[, diff := log2(value1) - log2(value2)]
+
+tiff(filename = "tmp/hk2_rnaseq_DEGseq_HG-LG_maplot.tiff",
+     height = 6,
+     width = 6,
+     units = 'in',
+     res = 300,
+     compression = "lzw+p")
+plot(hg_lg$diff ~ hg_lg$mu,
+     pch = ".",
+     xlab = "Mean",
+     ylab = "Difference",
+     main = "HK2 Gene Expression, HG-LG, FDR < 0.05")
+points(hg_lg$diff[hg_lg$`q-value(Storey et al. 2003)` < 0.05 & hg_lg$diff > 0] ~ hg_lg$mu[hg_lg$`q-value(Storey et al. 2003)` < 0.05 & hg_lg$diff > 0] ,
+       pch = "x",
+       col = "green")
+points(hg_lg$diff[hg_lg$`q-value(Storey et al. 2003)` < 0.05 & hg_lg$diff < 0] ~ hg_lg$mu[hg_lg$`q-value(Storey et al. 2003)` < 0.05 & hg_lg$diff < 0] ,
+       pch = "x",
+       col = "red")
+abline(h = c(-1, 1),
+       lty = 2)
+graphics.off()
+
+# b. (MITC - HG)----
+DEGexp(geneExpMatrix1 = dt1,
+       geneCol1 = 1, 
+       expCol1 = 4, 
+       groupLabel1 = colnames(dt1)[4],
+       
+       geneExpMatrix2 = dt1,
+       geneCol2 = 1, 
+       expCol2 = 3,
+       groupLabel2 = colnames(dt1)[3],
+       
+       foldChange = 2,
+       qValue = 0.1,
+       thresholdKind = 5, 
+       rawCount = TRUE,
+       normalMethod = "none",
+       method = "MARS",
+       outputDir = "tmp")
+
+mitc_hg <- fread("tmp/output_score.txt")
+mitc_hg
+mitc_hg[mitc_hg$`Signature(q-value(Storey et al. 2003) < 0.1)`, ]
+
+# Write as CSV----
+write.csv(mitc_hg,
+          file = "tmp/HK2_RNAseq_DEGseq__MITC-HG.csv",
+          row.names = FALSE)
+
+# MA Plot----
+mitc_hg[, mu := (log2(value1) + log2(value2))/2]
+mitc_hg[, diff := log2(value1) - log2(value2)]
+
+tiff(filename = "tmp/hk2_rnaseq_DEGseq_MIT-HG_maplot.tiff",
+     height = 6,
+     width = 6,
+     units = 'in',
+     res = 300,
+     compression = "lzw+p")
+plot(mitc_hg$diff ~ mitc_hg$mu,
+     pch = ".",
+     xlab = "Mean",
+     ylab = "Difference",
+     main = "HK2 Gene Expression, MITC-HG, FDR < 0.05")
+points(mitc_hg$diff[mitc_hg$`q-value(Storey et al. 2003)` < 0.05 & mitc_hg$diff > 0] ~ mitc_hg$mu[mitc_hg$`q-value(Storey et al. 2003)` < 0.05 & mitc_hg$diff > 0] ,
+       pch = "x",
+       col = "green")
+points(mitc_hg$diff[mitc_hg$`q-value(Storey et al. 2003)` < 0.05 & mitc_hg$diff < 0] ~ mitc_hg$mu[mitc_hg$`q-value(Storey et al. 2003)` < 0.05 & mitc_hg$diff < 0] ,
+       pch = "x",
+       col = "red")
+abline(h = c(-0.3, 0.3),
+       lty = 2)
+graphics.off()
+
+# Venn diagram----
+g1 <- hg_lg[`q-value(Storey et al. 2003)` < 0.05 & 
+              `log2(Fold_change) normalized` > 1,]$GeneNames
+# 197 genes
+g2 <- hg_lg[`q-value(Storey et al. 2003)` < 0.05 & 
+              `log2(Fold_change) normalized` < -1,]$GeneNames
+# 223 genes
+
+g3 <- mitc_hg[`q-value(Storey et al. 2003)` < 0.05 & 
+                `log2(Fold_change) normalized` > 1,]$GeneNames
+# 284 genes
+g4 <- mitc_hg[`q-value(Storey et al. 2003)` < 0.05 & 
+                `log2(Fold_change) normalized` < -1,]$GeneNames
+# 291 genes
+
+up.dn <- g1[g1 %in% g4]
+# 57 genes
+dn.up <- g2[g2 %in% g3]
+# 86 genes
+
+# Combine and save the lists----
+all.genes <- Reduce(f = function(a, b){
+  merge(a, b, all = TRUE)
+},
+x = list(data.table(gene = g1,
+                    `log2(HG/LG) > 1` = g1),
+         data.table(gene = g2,
+                    `log2(HG/LG) < -1` = g2),
+         data.table(gene = g3,
+                    `log2(MITC/HG) > 1` = g3),
+         data.table(gene = g4,
+                    `log2(MITC/HG) < -1` = g4)))
+all.genes
+write.csv(all.genes,
+          file = "tmp/HK2_MITC_all_sign_genes.csv",
+          row.names = FALSE)
+  
+# # Heatmap----
+# ll <- unique(c(up.dn,
+#                dn.up))
+# 
+# t1 <- merge(hg_lg[hg_lg$GeneNames %in% ll, 
+#                   c("GeneNames",
+#                     "log2(Fold_change) normalized")],
+#             mitc_hg[mitc_hg$GeneNames %in% ll, 
+#                     c("GeneNames",
+#                       "log2(Fold_change) normalized")],
+#             by = "GeneNames")
+# colnames(t1) <- c("Gene",
+#                   "HG-LG",
+#                   "MITC-HG")
+# t1 <- t1[order(t1$`HG-LG`,
+#                decreasing = TRUE), ]
+# t1
+# write.csv(t1,
+#           file = "tmp/mes13_mitc_genes_q-0.5_log2-0.3.csv",
+#           row.names = FALSE)
+# 
+# ll <- melt.data.table(data = t1,
+#                       id.vars = 1,
+#                       measure.vars = 2:3,
+#                       variable.name = "Comparison",
+#                       value.name = "Gene Expression Diff")
+# ll$Comparison <- factor(ll$Comparison,
+#                         levels = c("MITC-HG", 
+#                                    "HG-LG"))
+# lvls <- ll[ll$Comparison == "HG-LG", ]
+# ll$Gene <- factor(ll$Gene,
+#                   levels = lvls$Gene[order(lvls$`Gene Expression Diff`)])
+# # Keep all 102 genes for the plot----
+# gene.keep <- unique(ll$Gene[order(abs(ll$`Gene Expression Diff`))])
+# ll <- droplevels(subset(ll,
+#                         Gene %in% gene.keep))
+# ll
+# 
+# p1 <- ggplot(data = ll) +
+#   coord_polar("y",
+#               start = 0,
+#               direction = -1) +
+#   geom_tile(aes(x =  as.numeric(Comparison),
+#                 y = Gene, 
+#                 fill = `Gene Expression Diff`),
+#             color = "white") +
+#   geom_text(data = ll[Comparison == "HG-LG", ],
+#             aes(x = rep(1.75,
+#                         nlevels(Gene)),
+#                 y = Gene,
+#                 label = unique(Gene),
+#                 angle = 90 + seq(from = 0,
+#                             to = 360,
+#                             length.out = nlevels(Gene))[as.numeric(Gene)]),
+#             hjust = 0) +
+#   scale_fill_gradient2(low = "red", 
+#                        high = "green", 
+#                        mid = "grey", 
+#                        midpoint = 0, 
+#                        name = "Gene Expr Diff") +
+#   scale_x_continuous(limits = c(0, 
+#                                 max(as.numeric(ll$Comparison)) + 0.5),
+#                      expand = c(0, 0)) + 
+#   scale_y_discrete("",
+#                    expand = c(0, 0)) +
+#   ggtitle("Changes in Gene Expression
+#           Fold-Change > 0.3 and q-Value < 0.5") + 
+#   theme(plot.title = element_text(hjust = 0.5),
+#         axis.title.x = element_blank(),
+#         axis.text.x = element_blank(),
+#         axis.ticks.x = element_blank(),
+#         axis.title.y = element_blank(),
+#         axis.text.y = element_blank(),
+#         axis.ticks.y = element_blank())
+# p1
+# 
+# tiff(filename = "tmp/mes13_rnaseq_DEGseq_MITC_heatmap.tiff",
+#      height = 10,
+#      width = 10,
+#      units = 'in',
+#      res = 300,
+#      compression = "lzw+p")
+# print(p1)
+# graphics.off()
+
+# sessionInfo()
+# sink()
