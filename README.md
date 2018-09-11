@@ -20,6 +20,9 @@
 ***/datastorage/Processed_BAM_Files/Renyi/RNA_gw/human***: processed .BAM files LG.sorted.bam, HG.sorted.bam and MIC1.sorted.bam      
 
 ## Daily Logs<a name="logs"></a>
+### 09/10/2018
+* Relabeled samples correctly - LG, HG and MITC, in that order. Rerun the code.
+
 ### 06/10/2018
 * Added donut hitmap with clustering
 

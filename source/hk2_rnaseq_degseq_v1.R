@@ -28,11 +28,11 @@ trt.names <- c("LG",
 dt1 <- fread("data/featurecounts.results.human.csv",
              skip = 1)
 dt1 <- droplevels(dt1[, c("Geneid",
-                          "HG.dedup.bam", 
-                          "LG.dedup.bam",
+                          "LG.dedup.bam", 
+                          "HG.dedup.bam",
                           "MIC1.dedup.bam")])
 colnames(dt1) <- c("gene",
-                trt.names)
+                   trt.names)
 
 dt1
 
@@ -44,6 +44,11 @@ dt1 <- droplevels(subset(dt1,
                          tmp > 10))
 dt1
 # 17,147 genes left, down from 26,364 genes
+# CHECK:
+dt1[gene == "ISG15", ]
+# gene   LG   HG MITC
+# ISG15 1175 1147 1300
+# OK (09/10/2018)
 
 # DEGseq----
 # a. (HG - LG)----
@@ -199,22 +204,22 @@ graphics.off()
 # Venn diagram----
 g1 <- hg_lg[`q-value(Storey et al. 2003)` < 0.05 & 
               `log2(Fold_change) normalized` > 1,]$GeneNames
-# 197 genes
+# 223 genes
 g2 <- hg_lg[`q-value(Storey et al. 2003)` < 0.05 & 
               `log2(Fold_change) normalized` < -1,]$GeneNames
-# 223 genes
+# 197 genes
 
 g3 <- mitc_hg[`q-value(Storey et al. 2003)` < 0.05 & 
                 `log2(Fold_change) normalized` > 1,]$GeneNames
-# 284 genes
+# 188 genes
 g4 <- mitc_hg[`q-value(Storey et al. 2003)` < 0.05 & 
                 `log2(Fold_change) normalized` < -1,]$GeneNames
-# 291 genes
+# 212 genes
 
 up.dn <- g1[g1 %in% g4]
-# 57 genes
+# 43 genes
 dn.up <- g2[g2 %in% g3]
-# 86 genes
+# 57 genes
 
 # Combine and save the lists----
 all.genes <- Reduce(f = function(a, b){
@@ -265,7 +270,7 @@ ll$Comparison <- factor(ll$Comparison,
 lvls <- ll[ll$Comparison == "HG-LG", ]
 ll$Gene <- factor(ll$Gene,
                   levels = lvls$Gene[order(lvls$`Gene Expression Diff`)])
-# Keep all 143 genes for the plot----
+# Keep all genes for the plot----
 gene.keep <- unique(ll$Gene[order(abs(ll$`Gene Expression Diff`))])
 ll <- droplevels(subset(ll,
                         Gene %in% gene.keep))
@@ -307,7 +312,7 @@ p3 <- ggplot(data = ll) +
         axis.title.y = element_blank(),
         axis.text.y = element_blank(),
         axis.ticks.y = element_blank())
-p4
+p3
 
 tiff(filename = "tmp/hk2_rnaseq_DEGseq_heatmap.tiff",
      height = 10,
@@ -315,7 +320,7 @@ tiff(filename = "tmp/hk2_rnaseq_DEGseq_heatmap.tiff",
      units = 'in',
      res = 300,
      compression = "lzw+p")
-print(p1)
+print(p3)
 graphics.off()
 
 # Heatmap with clustering----
